@@ -1,70 +1,65 @@
 // =============================================================
 // PATRÓN: Memento (Comportamiento) — Clase MEMENTO
-// Memento.js
+// models/Memento.js
 //
 // Responsabilidad: Guardar una "fotografía" inmutable del estado
-// del sistema en un momento determinado. El estado queda congelado
-// y NO puede ser modificado desde fuera (encapsulamiento).
+// del sistema. Estado congelado — sin setters, sin mutación.
 //
-// Roles del patrón:
-//   → Esta clase ES el Memento
-//   → El Originator la crea y la consume
-//   → El Caretaker la almacena sin conocer su contenido
+// v2: soporte serialización JSON para localStorage sin romper
+// el encapsulamiento del patrón.
 // =============================================================
 
-let _contadorGlobal = 0; // contador de snapshots guardados en toda la sesión
+let _contadorGlobal = 0;
 
 export class Memento {
-  // Propiedades privadas con # (encapsulamiento real ES2022)
   #estado;
   #timestamp;
   #id;
   #nombre;
   #numero;
 
-  /**
-   * @param {Object} estadoPlano - Estado a guardar (objeto plano)
-   * @param {string} nombre      - Etiqueta descriptiva del snapshot
-   */
-  constructor(estadoPlano, nombre = 'Estado guardado') {
-    // Object.freeze asegura inmutabilidad total del estado guardado
+  constructor(estadoPlano, nombre = 'Estado guardado', _meta = null) {
     this.#estado    = Object.freeze({ ...estadoPlano });
-    this.#timestamp = new Date();
-    this.#id        = `snap_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    this.#timestamp = _meta?.timestamp ? new Date(_meta.timestamp) : new Date();
+    this.#id        = _meta?.id ?? `snap_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     this.#nombre    = nombre;
     _contadorGlobal += 1;
-    this.#numero    = _contadorGlobal;
+    this.#numero    = _meta?.numero ?? _contadorGlobal;
   }
 
-  // ── Métodos de solo lectura (el Memento nunca expone setters) ──
+  getEstado()    { return { ...this.#estado }; }
+  getTimestamp() { return this.#timestamp; }
+  getId()        { return this.#id; }
+  getNombre()    { return this.#nombre; }
+  getNumero()    { return this.#numero; }
 
-  /** Devuelve una copia del estado guardado */
-  getEstado()     { return { ...this.#estado }; }
-
-  /** Devuelve la fecha/hora en que se creó el snapshot */
-  getTimestamp()  { return this.#timestamp; }
-
-  /** Identificador único del snapshot */
-  getId()         { return this.#id; }
-
-  /** Etiqueta legible para la UI */
-  getNombre()     { return this.#nombre; }
-
-  /** Número de perfil en orden de creación */
-  getNumero()     { return this.#numero; }
-
-  /**
-   * Genera una descripción resumida del estado guardado
-   * (para mostrar en el historial)
-   */
   describir() {
     const s = this.#estado;
-    const partes = [];
-    if (s.abs)             partes.push('ABS');
-    if (s.cinturones)      partes.push('Cinturón');
-    if (s.sensores)        partes.push('Sensores');
-    if (s.bloqueoInfantil) partes.push('Bloqueo');
-    partes.push(`${s.velocidad} km/h`);
-    return partes.join(' · ');
+    const chips = [];
+    if (s.abs)             chips.push('ABS');
+    if (s.cinturones)      chips.push('Cinturón');
+    if (s.sensores)        chips.push('Sensores');
+    if (s.bloqueoInfantil) chips.push('Bloqueo');
+    chips.push(`${s.velocidad} km/h`);
+    return chips.join(' · ');
+  }
+
+  // Serialización para PersistenciaService
+  toJSON() {
+    return {
+      estado:    { ...this.#estado },
+      nombre:    this.#nombre,
+      timestamp: this.#timestamp.toISOString(),
+      id:        this.#id,
+      numero:    this.#numero,
+    };
+  }
+
+  static fromJSON(json) {
+    return new Memento(json.estado, json.nombre, {
+      timestamp: json.timestamp,
+      id:        json.id,
+      numero:    json.numero,
+    });
   }
 }

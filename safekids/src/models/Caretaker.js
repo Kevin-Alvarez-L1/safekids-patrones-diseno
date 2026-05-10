@@ -1,64 +1,34 @@
 // =============================================================
-// PATRÓN: Memento (Comportamiento) — Clase CARETAKER
-// Caretaker.js
+// PATRÓN: Memento — Clase CARETAKER
+// models/Caretaker.js
 //
-// Responsabilidad: Custodiar el historial de Mementos.
-// NUNCA lee ni modifica el interior de un Memento (caja negra).
-// Solo sabe guardar, recuperar y eliminar Mementos por ID.
+// Custodia el historial de Mementos como "caja negra".
+// Nunca lee ni modifica el interior de un Memento.
 //
-// El Caretaker es el "archivero" del sistema.
+// v2: agrega importarDesdeJSON() para restaurar el historial
+// desde localStorage al iniciar la aplicación.
 // =============================================================
 
 import { Memento } from './Memento.js';
 
 export class Caretaker {
-  /** @type {Memento[]} */
   #historial = [];
-
-  /** @type {number} */
   #limite;
 
-  /**
-   * @param {number} limite - Máximo de snapshots almacenados
-   */
-  constructor(limite = 20) {
+  constructor(limite = 30) {
     this.#limite = limite;
   }
 
-  // ── Operaciones del historial ────────────────────────────────
-
-  /**
-   * Agrega un nuevo Memento al inicio del historial (más reciente primero).
-   * Si se excede el límite, elimina el más antiguo.
-   *
-   * @param {Memento} memento
-   */
   guardar(memento) {
-    if (!(memento instanceof Memento)) {
-      throw new Error('Caretaker.guardar: solo acepta instancias de Memento');
-    }
+    if (!(memento instanceof Memento)) throw new Error('Solo acepta instancias Memento');
     this.#historial.unshift(memento);
-    if (this.#historial.length > this.#limite) {
-      this.#historial.pop(); // descarta el más antiguo
-    }
+    if (this.#historial.length > this.#limite) this.#historial.pop();
   }
 
-  /**
-   * Busca y devuelve un Memento por su ID único.
-   *
-   * @param {string} id
-   * @returns {Memento|null}
-   */
   obtenerPorId(id) {
     return this.#historial.find(m => m.getId() === id) ?? null;
   }
 
-  /**
-   * Elimina un Memento específico del historial.
-   *
-   * @param {string} id
-   * @returns {boolean} - true si fue eliminado
-   */
   eliminar(id) {
     const idx = this.#historial.findIndex(m => m.getId() === id);
     if (idx === -1) return false;
@@ -66,22 +36,27 @@ export class Caretaker {
     return true;
   }
 
-  /** Elimina todo el historial */
-  limpiar() {
-    this.#historial = [];
+  limpiar() { this.#historial = []; }
+
+  obtenerTodos() { return [...this.#historial]; }
+
+  get cantidad() { return this.#historial.length; }
+
+  // ── Serialización para PersistenciaService ────────────────────
+
+  /** Exporta el historial como array de objetos JSON planos */
+  exportarJSON() {
+    return this.#historial.map(m => m.toJSON());
   }
 
   /**
-   * Devuelve una copia del historial completo (más reciente primero).
-   *
-   * @returns {Memento[]}
+   * Reconstruye el historial desde objetos JSON guardados.
+   * Llamado solo al inicializar el Controller (carga de localStorage).
+   * @param {Object[]} jsonArray
    */
-  obtenerTodos() {
-    return [...this.#historial];
-  }
-
-  /** Cantidad de snapshots en el historial */
-  get cantidad() {
-    return this.#historial.length;
+  importarDesdeJSON(jsonArray) {
+    this.#historial = jsonArray
+      .map(json => { try { return Memento.fromJSON(json); } catch { return null; } })
+      .filter(Boolean);
   }
 }

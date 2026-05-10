@@ -1,111 +1,111 @@
 // =============================================================
 // PATRÓN MVC — VIEW
-// EstadoVehiculo.jsx
+// views/EstadoVehiculo.jsx
 //
-// Vista que muestra el estado actual del vehículo en tiempo real.
-// Recibe datos del Controlador via props, nunca accede al Modelo.
+// Panel visual del vehículo. Se actualiza en tiempo real.
+// Recibe props del Controller — no accede al Modelo.
 // =============================================================
 
 import React from 'react';
+import { NivelBarra, SistemaChip, PatternBadge } from '../components/UIComponents.jsx';
 
-/**
- * Indicador individual de un sistema de seguridad
- */
-function Indicador({ etiqueta, activo, icono, descripcion }) {
+function Indicador({ icono, label, activo, detalle }) {
   return (
-    <div className={`indicador ${activo ? 'indicador--activo' : 'indicador--inactivo'}`}>
-      <div className="indicador__icono">{icono}</div>
-      <div className="indicador__info">
-        <span className="indicador__etiqueta">{etiqueta}</span>
-        <span className="indicador__desc">{descripcion || (activo ? 'Activado' : 'Desactivado')}</span>
+    <div className={`ind-card ${activo ? 'ind-card--on' : 'ind-card--off'}`}>
+      <div className="ind-card__top">
+        <span className="ind-card__icono">{icono}</span>
+        <span className={`ind-card__badge ${activo ? 'ind-badge--on' : 'ind-badge--off'}`}>
+          {activo ? 'ON' : 'OFF'}
+        </span>
       </div>
-      <div className={`indicador__estado ${activo ? 'estado--on' : 'estado--off'}`}>
-        {activo ? 'ON' : 'OFF'}
-      </div>
+      <div className="ind-card__label">{label}</div>
+      <div className="ind-card__detalle">{activo ? detalle.on : detalle.off}</div>
     </div>
   );
 }
 
-/**
- * EstadoVehiculo — Vista de solo lectura del estado de seguridad.
- *
- * @param {Object}  props
- * @param {Object}  props.estado        - Estado actual del vehículo
- * @param {string}  props.perfilActivo  - Perfil seleccionado actualmente
- */
 export function EstadoVehiculo({ estado, perfilActivo }) {
-  // Calcular nivel de seguridad (0-4 sistemas activos)
-  const sistemasActivos = [estado.abs, estado.cinturones, estado.sensores, estado.bloqueoInfantil]
-    .filter(Boolean).length;
+  const activos = [estado.abs, estado.cinturones, estado.sensores, estado.bloqueoInfantil].filter(Boolean).length;
+  const nivel   = Math.round((activos / 4) * 100);
 
-  const nivelSeguridad = Math.round((sistemasActivos / 4) * 100);
-
-  const colorNivel =
-    nivelSeguridad >= 75 ? 'nivel--alto'   :
-    nivelSeguridad >= 50 ? 'nivel--medio'  :
-    nivelSeguridad >= 25 ? 'nivel--bajo'   : 'nivel--nulo';
+  const velPct  = ((estado.velocidad - 20) / (200 - 20)) * 100;
+  const velColor = estado.velocidad <= 60 ? '#16a34a' : estado.velocidad <= 100 ? '#d97706' : '#dc2626';
 
   return (
     <div className="estado-vehiculo">
 
-      {/* Cabecera con perfil y nivel */}
-      <div className="estado-vehiculo__header">
-        <div className="estado-vehiculo__perfil">
-          <span className="estado-vehiculo__perfil-label">Perfil activo</span>
-          <span className="estado-vehiculo__perfil-nombre">{estado.nombrePerfil}</span>
+      {/* Cabecera */}
+      <div className="estado-vehiculo__head">
+        <div>
+          <PatternBadge tipo="mvc" />
+          <h2 className="ev-titulo">Estado del Vehículo</h2>
+          <p className="ev-subtitulo">Actualización en tiempo real</p>
         </div>
-        <div className={`nivel-seguridad ${colorNivel}`}>
-          <span className="nivel-seguridad__num">{nivelSeguridad}%</span>
-          <span className="nivel-seguridad__label">Seguridad</span>
+        <div className="ev-perfil-chip">
+          <span className="ev-perfil-icon">🛡️</span>
+          <span className="ev-perfil-nombre">{estado.nombrePerfil}</span>
         </div>
       </div>
 
-      {/* Velocímetro visual */}
+      {/* Velocímetro */}
       <div className="velocimetro">
-        <div className="velocimetro__valor">{estado.velocidad}</div>
-        <div className="velocimetro__unidad">km/h máx.</div>
-        <div className="velocimetro__barra-wrap">
+        <div className="velocimetro__header">
+          <span className="velocimetro__label">Velocidad máxima permitida</span>
+        </div>
+        <div className="velocimetro__display">
+          <span className="velocimetro__valor" style={{ color: velColor }}>
+            {estado.velocidad}
+          </span>
+          <span className="velocimetro__unidad">km/h</span>
+        </div>
+        <div className="velocimetro__track">
           <div
-            className="velocimetro__barra"
-            style={{ width: `${(estado.velocidad / 200) * 100}%` }}
+            className="velocimetro__fill"
+            style={{ width: `${velPct}%`, background: velColor }}
           />
         </div>
+        <div className="velocimetro__rangos">
+          <span>20</span><span>60</span><span>100</span><span>140</span><span>200</span>
+        </div>
       </div>
 
-      {/* Grid de indicadores de sistemas */}
-      <div className="indicadores-grid">
+      {/* Nivel de seguridad */}
+      <div className="nivel-wrap">
+        <div className="nivel-row">
+          <span className="nivel-label">Nivel de seguridad</span>
+          <span className="nivel-chips">
+            {activos} de 4 sistemas activos
+          </span>
+        </div>
+        <NivelBarra porcentaje={nivel} />
+      </div>
+
+      {/* Grid de indicadores */}
+      <div className="ind-grid">
         <Indicador
-          etiqueta="ABS"
-          activo={estado.abs}
-          icono="🛞"
-          descripcion={estado.abs ? 'Frenos antibloqueo ON' : 'Sin ABS'}
+          icono="🛞" label="ABS" activo={estado.abs}
+          detalle={{ on: 'Antibloqueo activo', off: 'Sistema inactivo' }}
         />
         <Indicador
-          etiqueta="Cinturones"
-          activo={estado.cinturones}
-          icono="🔒"
-          descripcion={estado.cinturones ? 'Obligatorio' : 'Libre'}
+          icono="🔒" label="Cinturones" activo={estado.cinturones}
+          detalle={{ on: 'Uso obligatorio', off: 'Sin restricción' }}
         />
         <Indicador
-          etiqueta="Sensores"
-          activo={estado.sensores}
-          icono="📡"
-          descripcion={estado.sensores ? 'Proximidad ON' : 'Sin sensores'}
+          icono="📡" label="Sensores" activo={estado.sensores}
+          detalle={{ on: 'Proximidad ON', off: 'Sin detección' }}
         />
         <Indicador
-          etiqueta="Bloqueo Infantil"
-          activo={estado.bloqueoInfantil}
-          icono="🚗"
-          descripcion={estado.bloqueoInfantil ? 'Puertas bloqueadas' : 'Puertas libres'}
+          icono="🚗" label="Bloqueo" activo={estado.bloqueoInfantil}
+          detalle={{ on: 'Puertas bloqueadas', off: 'Puertas libres' }}
         />
       </div>
 
-      {/* Resumen compacto */}
-      <div className="resumen-seguridad">
-        <span className="resumen-seguridad__label">Sistemas activos:</span>
-        <span className="resumen-seguridad__valor">
-          {sistemasActivos} de 4
-        </span>
+      {/* Chips resumen */}
+      <div className="resumen-chips">
+        <SistemaChip activo={estado.abs}            label="ABS" />
+        <SistemaChip activo={estado.cinturones}     label="Cinturón" />
+        <SistemaChip activo={estado.sensores}       label="Sensores" />
+        <SistemaChip activo={estado.bloqueoInfantil} label="Bloqueo" />
       </div>
 
     </div>

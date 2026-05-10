@@ -1,130 +1,92 @@
 // =============================================================
 // PATRÓN: Facade (Estructural)
-// SistemaSeguridadFacade.js
+// facade/SistemaSeguridadFacade.js
 //
-// Propósito: Proveer una interfaz unificada y simplificada para
-// acceder a un conjunto de subsistemas complejos de seguridad.
+// PROPÓSITO: Proveer una interfaz unificada y simple para un
+// conjunto de subsistemas complejos. El cliente (Controller/Vista)
+// solo conoce la Fachada — nunca los subsistemas internos.
 //
-// La interfaz React NUNCA interactúa directamente con los
-// subsistemas. Todo pasa por esta Fachada.
+// PROBLEMA QUE RESUELVE: Sin Facade, la Vista debería coordinar
+// SistemaABS + SistemaCinturones + SistemaSensores + ... por
+// separado, acoplando la UI a la lógica interna. La Fachada
+// actúa como "punto de entrada único" al sistema de seguridad.
 //
-// Subsistemas internos:
-//   - SistemaABS
-//   - SistemaCinturones
-//   - SistemaSensores
-//   - SistemaVelocidad
-//   - SistemaBloqueoInfantil
+// VENTAJA: Si se cambia un subsistema (ej: SistemaABS → ABSv2),
+// solo cambia la Fachada internamente. El Controller no se entera.
 //
-// La Fachada también coordina con el Originator y Caretaker
-// para las operaciones del patrón Memento.
+// v2: integra PersistenciaService para sincronizar localStorage
+// sin que el Controller conozca detalles de almacenamiento.
 // =============================================================
 
-import { Configuracion } from '../models/Configuracion.js';
+import { Configuracion }     from '../models/Configuracion.js';
+import { PersistenciaService } from '../services/PersistenciaService.js';
 
-// ── SUBSISTEMAS (lógica interna, oculta del exterior) ────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// SUBSISTEMAS — privados, solo la Fachada los instancia
+// En un sistema real, aquí iría la comunicación con el hardware
+// ═══════════════════════════════════════════════════════════════
 
-/**
- * Subsistema ABS — Anti-lock Braking System
- * En un sistema real, aquí iría la comunicación con el hardware.
- */
 class SistemaABS {
-  activar()    { console.log('[ABS] Sistema ABS activado');    return true;  }
-  desactivar() { console.log('[ABS] Sistema ABS desactivado'); return false; }
-  validar(valor) {
-    // Lógica de validación del subsistema
-    return typeof valor === 'boolean' ? valor : false;
-  }
+  activar()      { return true;  }
+  desactivar()   { return false; }
+  validar(v)     { return !!v;   }
 }
 
-/**
- * Subsistema Cinturones — Verificación y bloqueo de cinturones
- */
 class SistemaCinturones {
-  activar()    { console.log('[CINTURONES] Cinturones obligatorios ON');  return true;  }
-  desactivar() { console.log('[CINTURONES] Cinturones obligatorios OFF'); return false; }
-  validar(valor) {
-    return typeof valor === 'boolean' ? valor : false;
-  }
+  activar()      { return true;  }
+  desactivar()   { return false; }
+  validar(v)     { return !!v;   }
 }
 
-/**
- * Subsistema Sensores — Sensores de proximidad y cámaras
- */
 class SistemaSensores {
-  activar()    { console.log('[SENSORES] Sensores de proximidad ON');  return true;  }
-  desactivar() { console.log('[SENSORES] Sensores de proximidad OFF'); return false; }
-  calibrar()   { console.log('[SENSORES] Calibración completada'); }
-  validar(valor) {
-    return typeof valor === 'boolean' ? valor : false;
-  }
+  activar()      { return true;  }
+  desactivar()   { return false; }
+  calibrar()     { /* calibración de hardware */ }
+  validar(v)     { return !!v;   }
 }
 
-/**
- * Subsistema Velocidad — Limitador de velocidad
- */
 class SistemaVelocidad {
   static MIN = 20;
   static MAX = 200;
-
-  establecer(valor) {
-    const v = Math.round(Math.max(SistemaVelocidad.MIN, Math.min(SistemaVelocidad.MAX, Number(valor))));
-    console.log(`[VELOCIDAD] Límite establecido a ${v} km/h`);
-    return v;
+  establecer(v) {
+    return Math.round(Math.max(SistemaVelocidad.MIN, Math.min(SistemaVelocidad.MAX, Number(v))));
   }
   get min() { return SistemaVelocidad.MIN; }
   get max() { return SistemaVelocidad.MAX; }
 }
 
-/**
- * Subsistema Bloqueo Infantil — Puertas y ventanas traseras
- */
 class SistemaBloqueoInfantil {
-  activar()    { console.log('[BLOQUEO] Bloqueo infantil ACTIVADO');    return true;  }
-  desactivar() { console.log('[BLOQUEO] Bloqueo infantil DESACTIVADO'); return false; }
-  validar(valor) {
-    return typeof valor === 'boolean' ? valor : false;
-  }
+  activar()      { return true;  }
+  desactivar()   { return false; }
+  validar(v)     { return !!v;   }
 }
 
-// ── FACADE ───────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// FACADE — interfaz pública del sistema de seguridad
+// ═══════════════════════════════════════════════════════════════
 
-/**
- * SistemaSeguridadFacade
- *
- * Interfaz simplificada que:
- * 1. Instancia y coordina todos los subsistemas
- * 2. Expone métodos de alto nivel comprensibles para la UI
- * 3. Coordina las operaciones Memento (guardar/restaurar)
- */
 export class SistemaSeguridadFacade {
-  /**
-   * @param {import('../models/Originator').Originator} originator
-   * @param {import('../models/Caretaker').Caretaker}   caretaker
-   */
   constructor(originator, caretaker) {
-    // Subsistemas — encapsulados, solo la Fachada los conoce
+    // Subsistemas encapsulados — invisibles para el exterior
     this._abs      = new SistemaABS();
     this._cinturon = new SistemaCinturones();
     this._sensores = new SistemaSensores();
     this._veloc    = new SistemaVelocidad();
     this._bloqueo  = new SistemaBloqueoInfantil();
 
-    // Referencia al Originator y Caretaker (patrón Memento)
+    // Dependencias del patrón Memento
     this._originator = originator;
     this._caretaker  = caretaker;
   }
 
-  // ── Métodos de configuración de perfiles ───────────────────────────────────
+  // ── Aplicar configuración (coordinación de todos los subsistemas) ──
 
   /**
-   * Aplica una configuración completa coordinando todos los subsistemas.
-   * Llamado internamente tras crear un perfil con la Factory.
-   *
-   * @param {Configuracion} config - Configuración creada por la Factory
+   * Método central: recibe una Configuracion (creada por Factory)
+   * y la aplica coordinando todos los subsistemas internos.
+   * La UI no sabe cómo funciona ABS, sensores, etc.
    */
   aplicarConfiguracion(config) {
-    console.log(`[FACADE] Aplicando configuración: ${config.nombrePerfil}`);
-
     const nueva = new Configuracion({
       abs:             this._abs.validar(config.abs),
       cinturones:      this._cinturon.validar(config.cinturones),
@@ -133,134 +95,101 @@ export class SistemaSeguridadFacade {
       bloqueoInfantil: this._bloqueo.validar(config.bloqueoInfantil),
       nombrePerfil:    config.nombrePerfil,
     });
-
-    // Activa o desactiva cada subsistema según el perfil
-    if (nueva.abs)             this._abs.activar();      else this._abs.desactivar();
-    if (nueva.cinturones)      this._cinturon.activar(); else this._cinturon.desactivar();
-    if (nueva.sensores)        this._sensores.activar(); else this._sensores.desactivar();
-    if (nueva.bloqueoInfantil) this._bloqueo.activar();  else this._bloqueo.desactivar();
-
     this._originator.setConfig(nueva);
-    console.log('[FACADE] Configuración aplicada exitosamente.');
+    this._persistirEstado();
   }
 
-  /**
-   * Activa todos los sistemas de seguridad al máximo.
-   * Velocidad fija en 30 km/h.
-   */
+  /** Activa todos los sistemas con velocidad mínima de seguridad */
   activarSeguridadTotal() {
-    console.log('[FACADE] ¡SEGURIDAD TOTAL ACTIVADA!');
-    const config = new Configuracion({
-      velocidad:       30,
-      abs:             true,
-      cinturones:      true,
-      sensores:        true,
-      bloqueoInfantil: true,
-      nombrePerfil:    'Seguridad Total',
-    });
-    this.aplicarConfiguracion(config);
+    this.aplicarConfiguracion(new Configuracion({
+      velocidad: 30, abs: true, cinturones: true,
+      sensores: true, bloqueoInfantil: true,
+      nombrePerfil: 'Seguridad Total',
+    }));
   }
 
-  // ── Controles individuales (toggles manuales) ──────────────────────────────
+  // ── Controles individuales (Facade ocupa coordinar el estado) ──
 
-  /** Cambia el estado del ABS */
   toggleABS(activar) {
     const cfg = this._originator.getConfig();
-    const nuevaConfig = new Configuracion({
+    this._originator.setConfig(new Configuracion({
       ...cfg.toPlainObject(),
       abs: activar ? this._abs.activar() : this._abs.desactivar(),
       nombrePerfil: 'Manual',
-    });
-    this._originator.setConfig(nuevaConfig);
+    }));
+    this._persistirEstado();
   }
 
-  /** Cambia el estado de los cinturones */
   toggleCinturones(activar) {
     const cfg = this._originator.getConfig();
-    const nuevaConfig = new Configuracion({
+    this._originator.setConfig(new Configuracion({
       ...cfg.toPlainObject(),
       cinturones: activar ? this._cinturon.activar() : this._cinturon.desactivar(),
       nombrePerfil: 'Manual',
-    });
-    this._originator.setConfig(nuevaConfig);
+    }));
+    this._persistirEstado();
   }
 
-  /** Cambia el estado de los sensores */
   toggleSensores(activar) {
     const cfg = this._originator.getConfig();
-    const nuevaConfig = new Configuracion({
+    this._originator.setConfig(new Configuracion({
       ...cfg.toPlainObject(),
       sensores: activar ? this._sensores.activar() : this._sensores.desactivar(),
       nombrePerfil: 'Manual',
-    });
-    this._originator.setConfig(nuevaConfig);
+    }));
+    this._persistirEstado();
   }
 
-  /** Cambia el estado del bloqueo infantil */
   toggleBloqueoInfantil(activar) {
     const cfg = this._originator.getConfig();
-    const nuevaConfig = new Configuracion({
+    this._originator.setConfig(new Configuracion({
       ...cfg.toPlainObject(),
       bloqueoInfantil: activar ? this._bloqueo.activar() : this._bloqueo.desactivar(),
       nombrePerfil: 'Manual',
-    });
-    this._originator.setConfig(nuevaConfig);
+    }));
+    this._persistirEstado();
   }
 
-  /** Establece el límite de velocidad */
   setVelocidad(valor) {
     const cfg = this._originator.getConfig();
-    const nuevaConfig = new Configuracion({
+    this._originator.setConfig(new Configuracion({
       ...cfg.toPlainObject(),
       velocidad: this._veloc.establecer(valor),
-    });
-    this._originator.setConfig(nuevaConfig);
+    }));
+    this._persistirEstado();
   }
 
-  // ── Operaciones Memento ────────────────────────────────────────────────────
+  // ── Operaciones Memento ───────────────────────────────────────
 
-  /**
-   * GUARDAR: Crea un snapshot del estado actual y lo entrega al Caretaker.
-   *
-   * @param {string} nombre - Etiqueta del snapshot
-   * @returns {import('../models/Memento').Memento}
-   */
   guardarConfiguracion(nombre) {
-    console.log(`[FACADE] Guardando configuración: "${nombre}"`);
     const memento = this._originator.guardar(nombre);
     this._caretaker.guardar(memento);
+    this._persistirHistorial();
     return memento;
   }
 
-  /**
-   * RESTAURAR: Recupera un snapshot por ID y restaura el estado del Originator.
-   *
-   * @param {string} id - ID único del snapshot
-   * @returns {boolean} - true si la restauración fue exitosa
-   */
   restaurarConfiguracion(id) {
     const memento = this._caretaker.obtenerPorId(id);
-    if (!memento) {
-      console.warn(`[FACADE] No se encontró snapshot con id: ${id}`);
-      return false;
-    }
-    console.log(`[FACADE] Restaurando snapshot: ${memento.getNombre()}`);
+    if (!memento) return false;
     this._originator.restaurar(memento);
+    this._persistirEstado();
     return true;
   }
 
-  // ── Lecturas de estado ─────────────────────────────────────────────────────
+  // ── Persistencia (interna a la Fachada) ──────────────────────
 
-  /**
-   * Devuelve el estado actual como objeto plano (para React state).
-   * @returns {Object}
-   */
-  getEstadoActual() {
-    return this._originator.getConfig().toPlainObject();
+  /** Guarda el estado actual en localStorage vía PersistenciaService */
+  _persistirEstado() {
+    PersistenciaService.guardarConfig(this._originator.getConfig().toPlainObject());
   }
 
-  /** Límites del slider de velocidad */
-  getLimitesVelocidad() {
-    return { min: this._veloc.min, max: this._veloc.max };
+  /** Guarda el historial Memento en localStorage */
+  _persistirHistorial() {
+    PersistenciaService.guardarHistorial(this._caretaker.exportarJSON());
   }
+
+  // ── Lecturas ──────────────────────────────────────────────────
+
+  getEstadoActual()      { return this._originator.getConfig().toPlainObject(); }
+  getLimitesVelocidad()  { return { min: this._veloc.min, max: this._veloc.max }; }
 }

@@ -1,153 +1,131 @@
 // =============================================================
-// PATRÓN MVC — VIEW
-// HistorialMemento.jsx
+// PATRÓN MVC — VIEW + Memento
+// views/HistorialMemento.jsx
 //
-// Vista del historial de snapshots guardados (Patrón Memento).
-// Muestra la lista de Mementos custodiada por el Caretaker.
-// Permite restaurar o eliminar cada snapshot.
-//
-// La Vista solo conoce los datos que el Controlador le pasa.
+// Historial visual de snapshots guardados por el Caretaker.
+// Muestra tarjetas enriquecidas con toda la info del estado.
+// Permite restaurar y eliminar snapshots.
 // =============================================================
 
-import React from 'react';
+import React, { useState } from 'react';
+import { SistemaChip, PatternBadge } from '../components/UIComponents.jsx';
 
-/**
- * Formatea una fecha como "HH:MM:SS"
- */
+function formatFecha(date) {
+  return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+}
 function formatHora(date) {
-  return date.toLocaleTimeString('es-MX', {
-    hour:   '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-/**
- * Elemento individual de snapshot en el historial
- */
-function SnapshotItem({ memento, esReciente, onRestaurar, onEliminar }) {
-  const estado = memento.getEstado();
+function SnapshotCard({ memento, esReciente, enRestauracion, onRestaurar, onEliminar }) {
+  const [confirmar, setConfirmar] = useState(false);
+  const s = memento.getEstado();
 
-  // Indicadores visuales de los sistemas del snapshot
-  const sistemas = [
-    { key: 'abs',             label: 'ABS',    valor: estado.abs             },
-    { key: 'cinturones',      label: 'Cin.',   valor: estado.cinturones      },
-    { key: 'sensores',        label: 'Sen.',   valor: estado.sensores        },
-    { key: 'bloqueoInfantil', label: 'Blq.',   valor: estado.bloqueoInfantil },
-  ];
+  const velColor = s.velocidad <= 60 ? '#16a34a' : s.velocidad <= 100 ? '#d97706' : '#dc2626';
 
   return (
-    <div className={`snapshot-item ${esReciente ? 'snapshot-item--reciente' : ''}`}>
+    <div className={`snap-card ${esReciente ? 'snap-card--reciente' : ''} ${enRestauracion ? 'snap-card--restaurando' : ''}`}>
 
-      <div className="snapshot-item__top">
-        {/* Número y nombre */}
-        <div className="snapshot-item__id">
-          <span className="snapshot-item__num">#{memento.getNumero()}</span>
-          {esReciente && <span className="snapshot-item__nuevo-badge">Último</span>}
+      {/* Header de la tarjeta */}
+      <div className="snap-card__head">
+        <div className="snap-card__num-wrap">
+          <span className="snap-card__num">#{memento.getNumero()}</span>
+          {esReciente && <span className="snap-card__badge-nuevo">Último</span>}
         </div>
+        <div className="snap-card__nombre">{memento.getNombre()}</div>
+        <button
+          className="snap-card__del"
+          onClick={() => setConfirmar(true)}
+          title="Eliminar snapshot"
+        >✕</button>
+      </div>
 
-        <div className="snapshot-item__nombre">{memento.getNombre()}</div>
-
-        {/* Hora */}
-        <div className="snapshot-item__hora">
-          🕐 {formatHora(memento.getTimestamp())}
-        </div>
+      {/* Fecha y hora */}
+      <div className="snap-card__time">
+        <span>📅 {formatFecha(memento.getTimestamp())}</span>
+        <span>🕐 {formatHora(memento.getTimestamp())}</span>
       </div>
 
       {/* Velocidad */}
-      <div className="snapshot-item__velocidad">
-        🏎️ {estado.velocidad} km/h
+      <div className="snap-card__vel" style={{ color: velColor }}>
+        🏎️ <strong>{s.velocidad} km/h</strong> máximo
       </div>
 
-      {/* Indicadores de sistemas */}
-      <div className="snapshot-item__sistemas">
-        {sistemas.map(s => (
-          <span
-            key={s.key}
-            className={`sistema-chip ${s.valor ? 'sistema-chip--on' : 'sistema-chip--off'}`}
-          >
-            {s.label}
-          </span>
-        ))}
+      {/* Chips de sistemas */}
+      <div className="snap-card__sistemas">
+        <SistemaChip activo={s.abs}             label="ABS" />
+        <SistemaChip activo={s.cinturones}      label="Cinturón" />
+        <SistemaChip activo={s.sensores}        label="Sensores" />
+        <SistemaChip activo={s.bloqueoInfantil} label="Bloqueo" />
       </div>
-
-      {/* Descripción completa */}
-      <div className="snapshot-item__desc">{memento.describir()}</div>
 
       {/* Acciones */}
-      <div className="snapshot-item__acciones">
-        <button
-          className="btn-restaurar"
-          onClick={() => onRestaurar(memento.getId())}
-          title="Restaurar este estado"
-        >
-          ↩️ Restaurar
+      {confirmar ? (
+        <div className="snap-card__confirmar">
+          <span>¿Eliminar este snapshot?</span>
+          <div className="snap-card__confirmar-btns">
+            <button className="btn-confirmar-si"  onClick={() => onEliminar(memento.getId())}>Eliminar</button>
+            <button className="btn-confirmar-no"  onClick={() => setConfirmar(false)}>Cancelar</button>
+          </div>
+        </div>
+      ) : (
+        <button className="btn-restaurar" onClick={() => onRestaurar(memento.getId())}>
+          ↩️ Restaurar este estado
         </button>
-        <button
-          className="btn-eliminar-snap"
-          onClick={() => onEliminar(memento.getId())}
-          title="Eliminar este snapshot"
-        >
-          🗑️
-        </button>
-      </div>
+      )}
 
     </div>
   );
 }
 
-/**
- * HistorialMemento — Vista completa del historial de snapshots.
- *
- * @param {Object}   props
- * @param {Array}    props.historial      - Lista de Mementos del Caretaker
- * @param {Function} props.onRestaurar    - Llamada al Controlador
- * @param {Function} props.onEliminar     - Llamada al Controlador
- * @param {Function} props.onLimpiar      - Llamada al Controlador
- */
-export function HistorialMemento({ historial, onRestaurar, onEliminar, onLimpiar }) {
+export function HistorialMemento({ historial, onRestaurar, onEliminar, onLimpiar, ultimaRestauracion }) {
   return (
-    <div className="historial-memento">
+    <div className="historial">
 
-      <div className="historial-memento__header">
-        <div className="historial-memento__titulo-row">
-          <span className="panel-section__badge badge--memento">Memento</span>
-          <h2 className="panel-section__titulo">Historial de Estados</h2>
-        </div>
-        <p className="panel-section__desc">
-          Snapshots guardados por el Caretaker. Puedes restaurar cualquier estado anterior.
+      {/* Header */}
+      <div className="historial__head">
+        <PatternBadge tipo="memento" />
+        <h2 className="historial__titulo">Historial de Estados</h2>
+        <p className="historial__desc">
+          Snapshots guardados por el <strong>Caretaker</strong>. El <strong>Originator</strong> reconstruye el estado al restaurar.
         </p>
+
         {historial.length > 0 && (
-          <div className="historial-memento__meta">
-            <span className="historial-count">{historial.length} snapshot{historial.length !== 1 ? 's' : ''}</span>
+          <div className="historial__meta">
+            <span className="historial__count">
+              💾 {historial.length} snapshot{historial.length !== 1 ? 's' : ''}
+            </span>
             <button className="btn-limpiar" onClick={onLimpiar}>
-              🗑️ Limpiar historial
+              🗑️ Limpiar todo
             </button>
           </div>
         )}
       </div>
 
+      {/* Lista */}
       {historial.length === 0 ? (
-        <div className="historial-vacio">
-          <div className="historial-vacio__icono">📭</div>
-          <p className="historial-vacio__texto">No hay estados guardados.</p>
-          <p className="historial-vacio__sub">
-            Usa el botón "Guardar" en el panel de configuración para crear un snapshot.
+        <div className="historial__vacio">
+          <div className="historial__vacio-icono">📭</div>
+          <p className="historial__vacio-texto">Sin snapshots guardados</p>
+          <p className="historial__vacio-sub">
+            Usa el botón "Guardar Snapshot" en el panel de configuración.
           </p>
         </div>
       ) : (
-        <div className="historial-lista">
-          {historial.map((memento, idx) => (
-            <SnapshotItem
-              key={memento.getId()}
-              memento={memento}
-              esReciente={idx === 0}
+        <div className="historial__lista">
+          {historial.map((m, i) => (
+            <SnapshotCard
+              key={m.getId()}
+              memento={m}
+              esReciente={i === 0}
+              enRestauracion={m.getId() === ultimaRestauracion}
               onRestaurar={onRestaurar}
               onEliminar={onEliminar}
             />
           ))}
         </div>
       )}
+
     </div>
   );
 }
